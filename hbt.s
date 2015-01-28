@@ -83,22 +83,37 @@ l_move_right:
     jnz l_move_up           ; tile is solid, don't move right
     addi re, 2
 l_move_up:
+    cmpi r1, 1
+    jnz l_move_up_grav
+    ldm r4, v_grounded
+    cmpi r4, 1
+    jnz l_move_up_grav
+    ldi r3, -10
+    stm r3, v_gravity
+l_move_up_grav:
     ldm r3, v_gravity
     mov ra, re
     divi ra, 8
     mov rb, rf
+    addi rb, 16             ; add size of player sprite!
     add rb, r3
     divi rb, 8
     call l_tile_solid
     tsti ra, 1
     jnz l_move_up_end       ; tile is solid, stop falling
+    ldi r4, 0
     add rf, r3
     addi r3, 1
+    cmpi r3, 8
+    jl l_move_end
+    ldi r3, 7               ; gravity of 7 pixels/frame max.
     jmp l_move_end
 l_move_up_end:
     ldi r3, 0               ; reset the gravity
+    ldi r4, 1
 l_move_end:
     stm r3, v_gravity
+    stm r4, v_grounded
 
 ;------------------------------------------------------------------------------
 ; l_draw_missing: Determine and redraw the tiles behind the player
@@ -129,7 +144,7 @@ l_draw_missing:
     mov r8, r1          ; save the leftmost tile x since we overwrite it below
 l_draw_missing_loop_y:
     cmp r3, r4
-    jz l_draw_missing_end
+    jg l_draw_missing_end
     mov r1, r8
 l_draw_missing_loop_x:
     cmp r1, r2
@@ -147,6 +162,7 @@ l_draw_missing_loop_x:
     andi r9, 0x3f
     muli r9, 32
     add r9, r5
+aaa:
     drw r6, r7, r9
 
     addi r1, 1
@@ -231,11 +247,13 @@ l_tile_solid:
     add r0, ra
     addi r0, data_lvl
     ldm r0, r0
-    shl r0, 6
+    shr r0, 6
     andi r0, 1
-    mov r0, ra
+    mov ra, r0
     pop r0
     ret
 
 v_gravity:
+    dw 0
+v_grounded:
     dw 0
