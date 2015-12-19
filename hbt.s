@@ -62,18 +62,7 @@ l_input_right:
     ldi r0, 2
 l_input_a:
     tsti r2, PAD_A
-;-----------------------
-; NEW    
-;-----------------------
-;    jz l_input_a_off
-;    ldi r1, 1
-;    jmp l_input_move
-;-----------------------
-
     jz l_move
-    ldm r2, v_gravity
-    cmpi r2, 0
-    jnz l_input_a_off
     ldm r2, v_grounded
     cmpi r2, 1
     jnz l_input_a_off
@@ -81,17 +70,10 @@ l_input_a:
     jmp l_move
 l_input_a_off:
     ldi r1, 0
-;-----------------------
-;l_input_move:
-;    mov ra, r0
-;    mov rb, r1
-;    call l_move_player
-;    mov rc, re              ; keep old player x for tile redrawing
-;    mov rd, rf              ; likewise for old player y
-;    jmp l_draw_missing
-;-----------------------
     
 l_move:
+    ldm r4, v_grounded
+    stm r4, v_grounded_old  ; grounded_old = grounded
     mov rc, re              ; keep old player x for tile redrawing
     mov rd, rf              ; likewise for old player y
 l_move_left:
@@ -102,7 +84,8 @@ l_move_left:
     ldi r3, PLAYER_RUN
     stm r3, v_state
     mov ra, re
-    subi ra, 2
+    ;subi ra, 2
+    addi ra, 2
     divi ra, 8              ; ra: tile x of 2 pixels left
     mov rb, rf
     divi rb, 8              ; rb: tile y
@@ -123,7 +106,7 @@ l_move_right:
     ldi r3, PLAYER_RUN
     stm r3, v_state
     mov ra, re
-    addi ra, 18             ; add 2 + 16 (size of sprite) 
+    addi ra, 12             ; add 2 + 16 (size of sprite) 
     divi ra, 8              ; ra: tile x of 2 pixels right
     mov rb, rf
     divi rb, 8              ; rb: tile y
@@ -147,13 +130,14 @@ l_move_up:
     ldm r4, v_grounded
     cmpi r4, 1
     jnz l_move_up_grav
-    ldi r0, PLAYER_JUMP
-    stm r0, v_state
+    ldi r3, PLAYER_JUMP
+    stm r3, v_state
     ldi r3, -12
     stm r3, v_gravity
 l_move_up_grav:
     ldm r3, v_gravity
     mov ra, re              ; check for left part of sprite
+    addi ra, 4
     divi ra, 8
     mov rb, rf
     cmpi r3, 0
@@ -166,7 +150,7 @@ l_move_up_gravl:
     tsti ra, 1
     jnz l_move_up_end       ; tile is solid, stop falling
     mov ra, re              ; now check right part of sprite
-    addi ra, 16             ; by adding size of player sprite
+    addi ra, 10             ; by adding size of player sprite
     divi ra, 8
     mov rb, rf
     cmpi r3, 0
@@ -176,14 +160,16 @@ l_move_up_gravr:
     add rb, r3
     divi rb, 8
     call l_tile_solid
-    tsti ra, 1
-    jnz l_move_up_end       ; tile is solid, stop falling
-    ldi r4, 0
+    cmpi ra, 1
+    jz l_move_up_end        ; tile is solid, stop falling
     add rf, r3
     addi r3, 1
     cmpi r3, 8
-    jl l_move_end
+    jl l_move_zzz
     ldi r3, 7               ; gravity of 7 pixels/frame max.
+l_move_zzz:
+    ldi r4, 0
+    stm r4, v_grounded
     jmp l_move_end
 l_move_up_end:
     cmpi r3, 0
@@ -194,17 +180,16 @@ l_move_up_end_g:
     jz l_move_up_end_g2     ; skip playing sound if we were already grounded
     call l_sound_fall
 l_move_up_end_g2:
-    ldm r4, v_grounded
-    stm r4, v_grounded_old  ; grounded_old = grounded
     ldi r4, 1
     stm r4, v_grounded      ; grounded = 1
     ldi r3, PLAYER_RUN
     stm r3, v_state         ; player is not falling, change sprite
-    ldi r3, 0               ; reset the gravity
+    ldi r3, 1               ; reset the gravity
     jmp l_move_end
 l_move_up_end_ng:
     ldi r4, 0
     stm r4, v_grounded
+    ldi r3, 1
 l_move_end:
     stm r3, v_gravity
     jmp l_draw_missing
@@ -388,9 +373,9 @@ l_tile_solid:
 ; It uses a short noise envelope at 2000 Hz to do so.
 ;------------------------------------------------------------------------------
 l_sound_fall:
-    sng 0x62, 0xa3a5
+    sng 0x02, 0xa3a4
     ldi ra, v_snd_fall
-    snp ra, 80
+    snp ra, 30
     ret
 
 ;------------------------------------------------------------------------------
@@ -414,105 +399,3 @@ v_counter:
     dw 0
 v_snd_fall:
     dw 2000
-
-;------------------------------------------------------------------------------
-; Move the player according to input, v-speed, and tilemap.
-;
-; input: ra=h-move [0=none, 1=left, 2=right], rb=jump
-; output: none
-;------------------------------------------------------------------------------
-l_move_player:
-    ldi r9, 8
-
-l_move_player_h:
-    mov r0, re
-    mov r1, rf
-    mov r2, ra
-    push rb
-    cmpi ra, 0
-    jz l_move_player_v      ; no movement need on h-axis
-l_move_player_h_l:
-    cmpi ra, 1
-    jnz l_move_player_h_r
-    subi r0, 2
-    jmp l_move_player_h_test
-l_move_player_h_r:
-    addi r0, 2
-    addi r0, 16             ; add player width as we compare right side here
-l_move_player_h_test:
-    div r0, r9, ra
-    div r1, r9, rb          ; get tile (x,y) of new position
-    call l_tile_solid
-    cmpi ra, 1
-    jz l_move_player_v      ; solid tile at new position; don't move
-    div r0, r9, ra
-    div r1, r9, rb
-    addi rb, 1              ; we now test the under tile (x,y) of new position
-    call l_tile_solid
-    cmpi ra, 1
-    jz l_move_player_v      ; solid tile at new position; don't move
-    cmpi r2, 2
-    jl l_move_player_h_test2
-    subi r0, 16
-l_move_player_h_test2:
-    mov re, r0              ; otherwise, update player x
-
-l_move_player_v:
-    pop rb
-    cmpi rb, 1
-    jnz l_move_player_v_update
-    ldm r0, v_gravity
-    cmpi r0, 0
-    jnz l_move_player_v_update  ; jump if player is on ground, i.e. gravity==0
-    ldi r2, -12 
-    stm r2, v_gravity
-    jmp l_move_player_v_l
-l_move_player_v_update:
-    ldm r2, v_gravity
-    addi r2, 1
-    cmpi r2, 8
-    jl l_move_player_v_update_store
-    ldi r2, 7               ; clamp downward v-speed to 7 pixels/frame
-l_move_player_v_update_store:
-    stm r2, v_gravity
-l_move_player_v_l:
-    mov r0, re
-    mov r1, rf
-    add r1, r2
-    cmpi r2, 0
-    jl l_move_player_v_l2
-    addi r1, 16             ; add player height as we compare under side here
-l_move_player_v_l2:
-    div r0, r9, ra
-    div r1, r9, rb          ; get tile (x,y) of new position
-    call l_tile_solid
-    cmpi ra, 1
-    jz l_move_player_end    ; solid tile at new position; don't move
-    cmpi r2, 0
-    jl l_move_player_vl3
-    subi r1, 16
-l_move_player_vl3:
-    mov rf, r1
-
-l_move_player_v_r:
-    mov r0, re
-    addi r0, 16
-    mov r1, rf
-    add r1, r2
-    cmpi r2, 0
-    jl l_move_player_v_r2
-    addi r1, 16
-l_move_player_v_r2:
-    div r0, r9, ra
-    div r1, r9, rb
-    cmpi ra, 1
-    jz l_move_player_end
-    cmpi r2, 0
-    jl l_move_player_v_r3
-    subi r1, 16
-l_move_player_v_r3:
-    mov rf, r1
-
-l_move_player_end:
-    ret
-
