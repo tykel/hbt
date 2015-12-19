@@ -95,8 +95,8 @@ int main(int argc, char *argv[])
                                 level, x, y)) {
                     //printf("match found, tile[%d,%d] = tilemap[%d]\n", x, y, t);
                     int solid = (t!=3 && t!=15 && t!=16 && t!=17 && t!=18 &&
-                                 t!=19 && t!=22 && t!=23 && t!=27 && t!=28 &&
-                                 t!=30) 
+                                 t!=19 && t!=22 && t!=23 && t!=24 && t!=25 &&
+                                 t!= 26 && t!=27 && t!=28 && t!=30 && t!=11) 
                                 << 6;
                     int end = (t==15 || t==16 || t==18 || t==19) << 7;
                     output[y*NTILES_W + x] = end | solid | t;
