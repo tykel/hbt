@@ -62,14 +62,19 @@ l_input_right:
     ldi r0, 2
 l_input_a:
     tsti r2, PAD_A
-    jz l_move
-    ldm r2, v_grounded
-    cmpi r2, 1
-    jnz l_input_a_off
-    ldi r1, 1
+    jnz l_input_a_checks
+    ldi r3, 0
+    stm r3, v_apress
     jmp l_move
-l_input_a_off:
-    ldi r1, 0
+l_input_a_checks:
+    ldm r3, v_apress
+    cmpi r3, 1
+    jz l_move
+    ldm r3, v_grounded
+    cmpi r3, 1
+    jnz l_move
+    ldi r1, 1
+    stm r1, v_apress
     
 l_move:
     ldm r4, v_grounded
@@ -399,3 +404,5 @@ v_counter:
     dw 0
 v_snd_fall:
     dw 2000
+v_apress:
+    dw 0
