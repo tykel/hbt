@@ -70,15 +70,13 @@ l_input_a_checks:
     ldm r3, v_apress
     cmpi r3, 1
     jz l_move
-    ldm r3, v_grounded
-    cmpi r3, 1
-    jnz l_move
     ldi r1, 1
     stm r1, v_apress
     
 l_move:
     ldm r4, v_grounded
     stm r4, v_grounded_old  ; grounded_old = grounded
+
     mov rc, re              ; keep old player x for tile redrawing
     mov rd, rf              ; likewise for old player y
 l_move_left:
@@ -89,7 +87,6 @@ l_move_left:
     ldi r3, PLAYER_RUN
     stm r3, v_state
     mov ra, re
-    ;subi ra, 2
     addi ra, 2
     divi ra, 8              ; ra: tile x of 2 pixels left
     mov rb, rf
@@ -177,8 +174,22 @@ l_move_zzz:
     stm r4, v_grounded
     jmp l_move_end
 l_move_up_end:
-    cmpi r3, 0
-    jl l_move_up_end_ng     ; grounded if solid tile AND falling down
+    mov ra, re
+    divi ra, 8
+    mov rb, rf
+    addi rb, 17 
+    divi rb, 8
+    push ra
+    push rb
+    call l_tile_solid
+    cmpi ra, 1
+    pop rb
+    pop ra
+    jz l_move_up_end_g
+    addi ra, 1
+    call l_tile_solid
+    cmpi ra, 1
+    jnz l_move_up_end_ng
 l_move_up_end_g:
     ldm r4, v_grounded_old
     cmpi r4, 1
@@ -197,7 +208,54 @@ l_move_up_end_ng:
     ldi r3, 1
 l_move_end:
     stm r3, v_gravity
+l_move_adjust:
+    mov ra, re
+    addi ra, 4
+    divi ra, 8
+    mov rb, rf
+    addi rb, 7
+    divi rb, 8
+    call l_tile_solid
+    cmpi ra, 1
+    ;jnz l_draw_missing
+    jnz l_move_adjust_notin_solid
+l_move_adjust_in_solid:
+    spr 0x0804
+    ldi r4, 0
+    drw r4, r4, _inlinespr
+    jmp l_m_a
+_inlinespr:
+    db 0x55, 0x55, 0x55, 0x55
+    db 0x55, 0x55, 0x55, 0x55
+    db 0x55, 0x55, 0x55, 0x55
+    db 0x55, 0x55, 0x55, 0x55
+    db 0x55, 0x55, 0x55, 0x55
+    db 0x55, 0x55, 0x55, 0x55
+    db 0x55, 0x55, 0x55, 0x55
+    db 0x55, 0x55, 0x55, 0x55
+l_move_adjust_notin_solid:
+    spr 0x0804
+    ldi r4, 0
+    drw r4, r4, _inlinespr2
     jmp l_draw_missing
+_inlinespr2:
+    db 0x33, 0x33, 0x33, 0x33
+    db 0x33, 0x33, 0x33, 0x33
+    db 0x33, 0x33, 0x33, 0x33
+    db 0x33, 0x33, 0x33, 0x33
+    db 0x33, 0x33, 0x33, 0x33
+    db 0x33, 0x33, 0x33, 0x33
+    db 0x33, 0x33, 0x33, 0x33
+    db 0x33, 0x33, 0x33, 0x33
+l_m_a:
+    cmpi r0, 1
+    jnz l_move_adjustr
+    addi re, 2
+    jmp l_draw_missing
+l_move_adjustr:
+    cmpi r0, 2
+    jnz l_draw_missing
+    subi re, 2
 
 ;------------------------------------------------------------------------------
 ; l_draw_missing: Determine and redraw the tiles behind the player
