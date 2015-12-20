@@ -2,8 +2,12 @@ importbin ./data/palette.bin 0 48 data_pal
 importbin ./gfx/c2b.bin 0 1664 spr_c2b
 importbin ./gfx/enemy.bin 0 256 spr_enemy
 importbin ./gfx/stuffx.bin 0 224 spr_stuffx
-importbin ./gfx/tiles.bin 0 992 spr_tiles
-importbin ./data/1h.bin.map 0 1024 data_lvl
+importbin ./gfx/tiles.bin 0 2976 spr_tiles
+importbin ./data/1h.bin.map 0 1024 data_lvl1
+importbin ./data/2a.bin.map 0 1024 data_lvl2
+importbin ./data/3p.bin.map 0 1024 data_lvl2
+importbin ./data/4p.bin.map 0 1024 data_lvl2
+importbin ./data/5y.bin.map 0 1024 data_lvl2
 
 io_pad1     equ 0xfff0
 PAD_UP      equ 0x01
@@ -15,11 +19,13 @@ PAD_START   equ 0x20
 PAD_A       equ 0x40
 PAD_B       equ 0x80
 
-PLAYER_RUN   equ 0
-PLAYER_JUMP  equ 1
+PLAYER_RUN  equ 0
+PLAYER_JUMP equ 1
 
-DIR_LEFT     equ 0
-DIR_RIGHT    equ 1
+DIR_LEFT    equ 0
+DIR_RIGHT   equ 1
+
+LAST_LEVEL  equ 4
 
 ;------------------------------------------------------------------------------
 ; l_init: initialise global variables and drawing
@@ -30,7 +36,7 @@ DIR_RIGHT    equ 1
 l_init:
     pal data_pal
     bgc 0x1
-    ldi re, 24 
+    ldi re, 38 
     ldi rf, 70 
     call l_draw
     jmp l_input
@@ -177,6 +183,14 @@ l_move_up_end:
     mov ra, re
     divi ra, 8
     mov rb, rf
+    addi rb, 15
+    divi rb, 8
+    call l_tile_end
+    cmpi ra, 1
+    jz l_next_level
+    mov ra, re
+    divi ra, 8
+    mov rb, rf
     addi rb, 17 
     divi rb, 8
     push ra
@@ -271,7 +285,9 @@ l_move_adjustr:
 ;------------------------------------------------------------------------------
 l_draw_missing:
     spr 0x0804
-    ldi r0, data_lvl
+    ldm r0, v_level
+    shl r0, 10          ; 1024 bytes in a level
+    addi r0, data_lvl1
     ldi r5, spr_tiles
     mov r1, rc
     divi r1, 8          ; r1: leftmost tile x
@@ -347,6 +363,115 @@ l_draw_missing_drw:
     vblnk
     jmp l_input
     
+l_next_level:
+    ldm r0, v_level
+    cmpi r0, LAST_LEVEL
+    jz l_draw_missing
+    call l_store_pal
+    ldi r0, 0
+l_next_level_loop:
+    cmpi r0, 20
+    jge l_next_level_end
+    push r0
+    call l_shade_pal
+    call l_draw
+    vblnk
+    pop r0
+    addi r0, 1
+    jmp l_next_level_loop
+l_next_level_end:
+    call l_restore_pal
+    ldm r0, v_level
+    addi r0, 1
+    stm r0, v_level
+    jmp l_init
+
+;------------------------
+; store_pal: save the palette to 0xf000
+;------------------------
+l_store_pal:
+    push r0
+    push r1
+    push r2
+    push r3
+    ldi r0, 0
+    ldi r1, data_pal
+    ldi r2, 0xf000          ; pick this address to store temp palette
+l_store_pal_loop:
+    cmpi r0, 48             ; 48 bytes of palette data
+    jz l_store_pal_loop_end
+    ldm r3, r1
+    stm r3, r2
+    addi r0, 2
+    addi r1, 2
+    addi r2, 2
+    jmp l_store_pal_loop
+l_store_pal_loop_end:
+    pop r3
+    pop r2
+    pop r1
+    pop r0
+    ret
+
+;------------------------
+; restore_pal: load the palette from 0xf000
+;------------------------
+l_restore_pal:
+    push r0
+    push r1
+    push r2
+    push r3
+    ldi r0, 0
+    ldi r1, data_pal
+    ldi r2, 0xf000          ; pick this address to store temp palette
+l_restore_pal_loop:
+    cmpi r0, 48             ; 48 bytes of palette data
+    jz l_restore_pal_loop_end
+    ldm r3, r2
+    stm r3, r1
+    addi r0, 2
+    addi r1, 2
+    addi r2, 2
+    jmp l_restore_pal_loop
+l_restore_pal_loop_end:
+    pop r3
+    pop r2
+    pop r1
+    pop r0
+    ret
+
+;------------------------
+; shade_pal: divide each color component of the palette by 2
+;------------------------
+l_shade_pal:
+    push r0
+    push r1
+    push r2
+    push r3
+    ldi r0, 0
+    ldi r1, data_pal
+l_shade_pal_loop:
+    cmpi r0, 48             ; 48 bytes of palette data
+    jz l_shade_pal_loop_end
+    ldm r2, r1
+    mov r3, r2
+    andi r3, 0xff00
+    andi r2, 0x00ff
+    muli r2, 6
+    divi r2, 7
+    or r2, r3
+    stm r2, r1
+    addi r0, 1
+    addi r1, 1
+    jmp l_shade_pal_loop
+l_shade_pal_loop_end:
+    pop r3
+    pop r2
+    pop r1
+    pop r0
+    pal data_pal
+    ret
+
 ;------------------------------------------------------------------------------
 ; l_draw: Level draw routine
 ;
@@ -361,7 +486,9 @@ l_draw_missing_drw:
 l_draw:
     cls
     spr 0x0804
-    ldi r0, data_lvl
+    ldm r0, v_level
+    shl r0, 10
+    addi r0, data_lvl1
     ldi r4, spr_tiles
     ldi r2, 0
 l_draw_lvly:
@@ -399,15 +526,20 @@ l_draw_end:
 ;------------------------------------------------------------------------------
 l_tile_ptr_from_xy:
     push r0
+    push r1
     mov r0, rb
     muli r0, 32
     add r0, ra
-    addi r0, data_lvl 
+    ldm r1, v_level
+    shl r1, 10
+    addi r1, data_lvl1
+    add r0, r1
     ldm r0, r0
     andi r0, 0x3f
     muli r0, 32
     addi r0, spr_tiles
     mov ra, r0
+    pop r1
     pop r0
     ret
 
@@ -419,14 +551,43 @@ l_tile_ptr_from_xy:
 ;------------------------------------------------------------------------------
 l_tile_solid:
     push r0
+    push r1
     mov r0, rb
     muli r0, 32
     add r0, ra
-    addi r0, data_lvl
+    ldm r1, v_level
+    shl r1, 10
+    addi r1, data_lvl1
+    add r0, r1
     ldm r0, r0
     shr r0, 6
     andi r0, 1
     mov ra, r0
+    pop r1
+    pop r0
+    ret
+
+;------------------------------------------------------------------------------
+; l_tile_end: Routine returning whether a tile (x,y) is an exit tile.
+;
+; input:  ra=x, rb=y
+; output: ra=0,1
+;------------------------------------------------------------------------------
+l_tile_end:
+    push r0
+    push r1
+    mov r0, rb
+    muli r0, 32
+    add r0, ra
+    ldm r1, v_level
+    shl r1, 10
+    addi r1, data_lvl1
+    add r0, r1
+    ldm r0, r0
+    shr r0, 7
+    andi r0, 1
+    mov ra, r0
+    pop r1
     pop r0
     ret
 
@@ -463,4 +624,6 @@ v_counter:
 v_snd_fall:
     dw 2000
 v_apress:
+    dw 0
+v_level:
     dw 0

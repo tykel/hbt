@@ -1,44 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <inttypes.h>
 
 #define TILE_W 4 
 #define TILE_H 8
 #define NTILES_W 32 
 #define NTILES_H 32
-#define TILESET_SIZE 31
+#define TILESET_SIZE 93
 
 int compare_tile(uint8_t *tile, uint8_t *level, int x, int y)
 {
     int row;
+    uint8_t buffer[32];
+    for(row = 0; row < TILE_H; ++row) {
+        memcpy(buffer + row*4, level + (y*8 + row)*128 + x*4, 4);
+    }
    
     /* Check with no mirroring */
     for(row = 0; row < TILE_H; ++row) {
-        int col;
-        uint8_t *tile2 = level + (y*TILE_H + row)*(TILE_W*NTILES_W) + x*TILE_W;
-        for(col = 0; col < TILE_W; ++col) {
-            //printf("checking pixel (%d, %d)\n", col, row);
-            if(*tile2 != *(tile + row*TILE_W + col))
-                goto flip_h;
-            ++tile2;
+        uint32_t src = *(uint32_t *)(tile + row*4);
+        uint32_t dst = *(uint32_t *)(buffer + row*4);
+        if(src != dst) {
+            return 0;
         }
     }
-    return 1;
-
-flip_h:
-    /* Check with horizontal mirroring */
-    for(row = 0; row < TILE_H; ++row) {
-        int col;
-        uint8_t *tile2 = level + (y*TILE_H + row)*(TILE_W*NTILES_W) + x*TILE_W + TILE_W;
-        for(col = 0; col < TILE_W; ++col) {
-            //printf("checking pixel (%d, %d)\n", col, row);
-            if((*tile2 & 0x0f) != (*(tile + row*TILE_W + col)) >> 8 ||
-               (*tile2 >> 8) != (*(tile + row*TILE_W + col)) & 0x0f)
-                return 0;
-            --tile2;
-        }
-    }
-
     return 1;
 }
 
@@ -64,9 +50,9 @@ int main(int argc, char *argv[])
     fclose(ftilemap);
 
     if(tilemap_size < TILE_W * TILE_H * TILESET_SIZE) {
-        fprintf(stderr, "error: tilemap not big enough... (%d bytes)\n",
-                tilemap_size);
-        exit(1);
+        //fprintf(stderr, "error: tilemap not big enough... (%d bytes)\n",
+        //        tilemap_size);
+        //exit(1);
     }
 
     flevel = fopen(argv[2], "rb");
@@ -94,11 +80,13 @@ int main(int argc, char *argv[])
                 if(compare_tile(tilemap + t*TILE_W*TILE_H,
                                 level, x, y)) {
                     //printf("match found, tile[%d,%d] = tilemap[%d]\n", x, y, t);
-                    int solid = (t!=3 && t!=15 && t!=16 && t!=17 && t!=18 &&
-                                 t!=19 && t!=22 && t!=23 && t!=24 && t!=25 &&
-                                 t!= 26 && t!=27 && t!=28 && t!=30 && t!=11) 
-                                << 6;
-                    int end = (t==15 || t==16 || t==18 || t==19) << 7;
+                    //int solid = (t!=3 && t!=15 && t!=16 && t!=17 && t!=18 &&
+                    //             t!=19 && t!=22 && t!=23 && t!=24 && t!=25 &&
+                    //             t!= 26 && t!=27 && t!=28 && t!=30 && t!=11) 
+                    //            << 6;
+                    int solid = (t==1||t==2||t==3||t==4||t==5||t==6||t==7||t==8||t==12||t==14||t==15||t==16||t==17||t==35||t==36) << 6;
+                    //int end = (t==15 || t==16 || t==18 || t==19) << 7;
+                    int end = (t==31||t==32||t==33||t==34) << 7;
                     output[y*NTILES_W + x] = end | solid | t;
                     break;
                 }
